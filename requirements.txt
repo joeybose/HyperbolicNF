@@ -192,7 +192,7 @@ stevedore==1.31.0
 subprocess32==3.5.4
 tensorboard==1.14.0
 tensorboardX==1.4
-tensorflow==1.10.1
+tensorflow==1.15.2
 tensorflow-estimator==1.14.0
 termcolor==1.1.0
 testpath==0.4.2
