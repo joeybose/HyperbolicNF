@@ -1,0 +1,28 @@
+program: main.py
+method: bayes
+metric:
+  name: Test AUC
+  goal: maximize
+parameters:
+  z_dim:
+    distribution: int_uniform
+    min: 2
+    max: 10
+  epochs:
+    distribution: constant
+    value: 2000
+  model:
+    distribution: categorical
+    values:
+      - Euclidean
+  dataset:
+    distribution: categorical
+    values:
+      - csphd
+  eval_set:
+    distribution: categorical
+    values:
+      - validation
+  hidden_dim:
+    distribution: constant
+    value: 128
