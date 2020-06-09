@@ -270,6 +270,7 @@ def plot_flow(radius, flow, target, namestr, n_blocks=2, samples=None):
 
     # Calculate densities of x, y coords on Lorentz model.
     probs = flow_model.log_prob(on_mani)
+    probs += logmap_logdet(clamped_threedim.cuda(), radius)
     probs = torch.exp(probs)
 
     on_mani_conv = on_mani.detach().cpu()
