@@ -117,6 +117,7 @@ def plot_density(xy_poincare, probs, radius, namestr, mu=None, flow=None):
     range_lim = 2
     # Define points within circle
     if mu is not None:
+        mu = mu.cpu().numpy()
         plt.plot(mu[:, 0], mu[:, 1], 'b+')
     ax.contourf(x, y, z, 100, antialiased=False, cmap='magma')
     # ax.pcolormesh(x, y, z,)
@@ -180,7 +181,7 @@ def train_potential_flow(flow_model, n_blocks, radius, target):
 
     return flow_model
 
-def train_flow(flow_model, radius, target):
+def train_flow(args, flow_model, radius, target):
     flow_model = kwargs_flows[flow_model](4, 2, 32, 1, layer_type='Linear',
                                           radius=torch.tensor(radius)).cuda()
     flow_opt = optim.Adam(flow_model.parameters())
@@ -193,7 +194,7 @@ def train_flow(flow_model, radius, target):
     train_loader = data.DataLoader(train_dataset, batch_size=512)
 
     train_loss_avg = []
-    for epoch in range(0, 100):
+    for epoch in range(0, args.flow_epochs):
         train_loss_avg.append(0)
         for batch_idx, data_batch in enumerate(train_loader):
 
@@ -213,7 +214,7 @@ def train_flow(flow_model, radius, target):
 
     return flow_model
 
-def train_flow_density(flow_model, n_blocks, radius, samples):
+def train_flow_density(args, flow_model, n_blocks, radius, samples):
     flow_model = kwargs_flows[flow_model](n_blocks, 2, 256, 1, layer_type='Linear',
                                           radius=torch.tensor(radius)).cuda()
     flow_opt = optim.Adam(flow_model.parameters())
@@ -223,7 +224,7 @@ def train_flow_density(flow_model, n_blocks, radius, samples):
     train_loader = data.DataLoader(train_dataset, batch_size=1024)
 
     train_loss_avg = []
-    for epoch in range(0, 200):
+    for epoch in range(0, args.flow_epochs):
         train_loss_avg.append(0)
         for batch_idx, data_batch in enumerate(train_loader):
 
@@ -243,14 +244,14 @@ def train_flow_density(flow_model, n_blocks, radius, samples):
 
     return flow_model
 
-def plot_flow(radius, flow, target, namestr, n_blocks=2, samples=None):
+def plot_flow(args, radius, flow, target, namestr, n_blocks=2, samples=None):
     fig = plt.figure()
     ax = fig.add_subplot(555)
     # flow_model = train_potential_flow(flow, radius, target)
     if samples is not None:
-        flow_model = train_flow_density(flow, n_blocks, radius, samples)
+        flow_model = train_flow_density(args, flow, n_blocks, radius, samples)
     else:
-        flow_model = train_flow(flow, radius, target)
+        flow_model = train_flow(args, flow, radius, target)
 
     # Map x, y coordinates on tangent space at origin to manifold (Lorentz model).
     x = torch.linspace(-5, 5, 100)
@@ -263,7 +264,8 @@ def plot_flow(radius, flow, target, namestr, n_blocks=2, samples=None):
     twodim = torch.stack((xx.flatten(), yy.flatten()), dim=1)
     # twodim = torch.cat([x, y], dim=1)
     threedim = expand_proj_dims(twodim)
-    clamped_threedim = clamp(threedim, min=-max_clamp_norm, max=max_clamp_norm)
+    clamped_threedim = clamp(threedim, min=-max_clamp_norm,
+            max=max_clamp_norm).to(args.dev)
     on_mani = exp_map_mu0(clamped_threedim, radius).cuda()
     flow_model.base_dist_mean = torch.zeros_like(on_mani).cuda()
     flow_model.base_dist_var = torch.ones(on_mani.shape[0], 2).cuda()
@@ -313,11 +315,11 @@ def some_density(args):
 
     plot_density(xy_poincare, probs, radius, args.namestr)
     if args.flow != 'none':
-        plot_flow(radius, args.flow, f1, args.namestr)
+        plot_flow(args, radius, args.flow, f1, args.namestr)
 
 def mixture(args):
-    radius = torch.Tensor([args.radius])
-    samples = sample_2d_data(args.dataset, 100000)
+    radius = torch.Tensor([args.radius]).to(args.dev)
+    samples = sample_2d_data(args.dataset, 100000).to(args.dev)
     samples = clamp(samples, min=-max_clamp_norm, max=max_clamp_norm)
     xi = samples[:,0].detach().cpu().numpy()
     yi = samples[:,1].detach().cpu().numpy()
@@ -347,10 +349,10 @@ def mixture(args):
     print("saved to install/{}.png".format(args.namestr))
 
     if args.flow != 'none':
-        plot_flow(args.radius, args.flow, p_z, args.namestr, n_blocks=args.n_blocks, samples=samples_h)
+        plot_flow(args, radius, args.flow, p_z, args.namestr, n_blocks=args.n_blocks, samples=samples_h)
 
 def gauss(args, mu, std):
-    radius = torch.Tensor([args.radius])
+    radius = torch.Tensor([args.radius]).to(args.dev)
 
     mu = clamp(mu, min=-max_clamp_norm, max=max_clamp_norm)
     mu_h = exp_map_mu0(expand_proj_dims(mu), radius)
@@ -365,7 +367,8 @@ def gauss(args, mu, std):
     y = torch.Tensor(y).view(-1, 1)
     twodim = torch.cat([x, y], dim=1)
     threedim = expand_proj_dims(twodim)
-    clamped_threedim = clamp(threedim, min=-max_clamp_norm, max=max_clamp_norm)
+    clamped_threedim = clamp(threedim, min=-max_clamp_norm,
+            max=max_clamp_norm).to(args.dev)
     on_mani = exp_map_mu0(clamped_threedim, radius)
 
     # Calculate densities of x, y coords on Lorentz model.
@@ -378,12 +381,14 @@ def gauss(args, mu, std):
 
     plot_density(xy_poincare, probs, args.radius, args.namestr, mu=mu_p)
     if args.flow != 'none':
-        plot_flow(args.radius, args.flow, p_z, args.namestr, args.n_blocks)
+        plot_flow(args, radius, args.flow, p_z, args.namestr, args.n_blocks)
 
 
 def main(args):
-    mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0)
-    std_1 = torch.Tensor([[0.5], [0.5]]).T
+    mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0).to(args.dev)
+    std_1 = torch.Tensor([[0.5], [0.5]]).T.to(args.dev)
+    # mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0).to(args.dev)
+    # std_1 = torch.Tensor([[1.0], [0.25]]).T.to(args.dev)
 
     # some_density(args)
     mixture(args)
@@ -406,5 +411,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='checkerboard',
                         help='output filename')
     parser.add_argument('--flow', type=str, default='none')
+    parser.add_argument('--flow_epochs', default=100, type=int)
     args = parser.parse_args()
+    args.dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     main(args)
