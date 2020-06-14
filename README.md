@@ -1,13 +1,31 @@
 # Normalizing Flows for Hyperbolic Spaces and Beyond!
+This repository contains code for reproducing results for ICML 2020 paper.
+"Latent Variable Modeling with Hyperbolic Normalizing Flows", by:
+Avishek Joey Bose, Ariella Smofsky, Renjie Liao, Prakash Panangaden, William L. Hamilton
+
+
+ArXiv Link: https://arxiv.org/pdf/2002.06336.pdf
+If this repository is helpful in your research, please consider citing us.
+
+```
+@article{bose2020latent,
+  title={Latent Variable Modelling with Hyperbolic Normalizing Flows},
+  author={Bose, Avishek Joey and Smofsky, Ariella and Liao, Renjie and Panangaden, Prakash and Hamilton, William L},
+  journal={Proceedings of the 37th International Conference on Machine Learning},
+  year={2020}
+}
+```
 
 ## Installation
-Python Packages:
+Main Python Packages:
 - Pytorch Geometric: https://github.com/rusty1s/pytorch_geometric
 Follow the installation instructions carefully for this package! Make sure all
 your environment Path variables are exactly as outlined otherwise you will get
 weird symbol errors
-- Pytorch
+- Pytorch 1.5
 - WandB for logging
+
+Other packages can be found in Requirements.txt but not all from that list are needed.
 
 Download the datasets:
 
