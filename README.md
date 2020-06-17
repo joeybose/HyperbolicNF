@@ -1,4 +1,5 @@
 # Normalizing Flows for Hyperbolic Spaces and Beyond!
+![alt text](https://github.com/joeybose/HyperbolicNF/blob/master/hyperflow_animation_large.gif "Hyperbolic NF")
 This repository contains code for reproducing results for ICML 2020 paper.
 "Latent Variable Modeling with Hyperbolic Normalizing Flows", by:
 Avishek Joey Bose, Ariella Smofsky, Renjie Liao, Prakash Panangaden, William L. Hamilton
