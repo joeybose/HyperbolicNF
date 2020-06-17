@@ -95,8 +95,10 @@ def sample_2d_data(dataset, n_samples):
         circ1_x = torch.cos(linspace1) * 0.125
         circ1_y = torch.sin(linspace1) * 0.125
 
-        x = torch.stack([torch.cat([circ4_x, circ3_x, circ2_x, circ1_x]),
-                         torch.cat([circ4_y, circ3_y, circ2_y, circ1_y])], dim=1) * 3.0
+        # x = torch.stack([torch.cat([circ4_x, circ3_x, circ2_x, circ1_x]),
+                         # torch.cat([circ4_y, circ3_y, circ2_y, circ1_y])], dim=1) * 3.0
+        x = torch.stack([torch.cat([2*circ4_x, 2*circ3_x, 2*circ2_x, 2*circ1_x]),
+                         torch.cat([2*circ4_y, 2*circ3_y, 2*circ2_y, 2*circ1_y])], dim=1) * 3.0
 
         # random sample
         x = x[torch.randint(0, n_samples, size=(n_samples,))]
@@ -131,11 +133,9 @@ def plot_density(xy_poincare, probs, radius, namestr, mu=None, flow=None):
     ax.axis('equal')
     ax.set_xlim(-args.axis_lim, args.axis_lim)
     ax.set_ylim(-args.axis_lim, args.axis_lim)
-
     if flow is not None:
         fig.savefig('install/{}_{}.png'.format(namestr, flow))
         print("saved to install/{}_{}.png".format(namestr, flow))
-
     else:
         # Save the full figure...
         fig.savefig('install/{}.png'.format(namestr))
@@ -181,7 +181,7 @@ def train_potential_flow(flow_model, n_blocks, radius, target):
 
     return flow_model
 
-def train_flow(args, flow_model, radius, target):
+def train_flow(args, flow_model, radius, target, clamped_threedim, on_mani):
     flow_model = kwargs_flows[flow_model](4, 2, 32, 1, layer_type='Linear',
                                           radius=torch.tensor(radius)).cuda()
     flow_opt = optim.Adam(flow_model.parameters())
@@ -212,9 +212,24 @@ def train_flow(args, flow_model, radius, target):
         print("Loss:{}".format(train_loss_avg[-1]))
         print("Epoch:{}".format(epoch))
 
+        # Calculate densities of x, y coords on Lorentz model.
+        flow_model.base_dist_mean = torch.zeros_like(on_mani).cuda()
+        flow_model.base_dist_var = torch.ones(on_mani.shape[0], 2).cuda()
+        probs = flow_model.log_prob(on_mani)
+        probs += logmap_logdet(clamped_threedim.cuda(), radius)
+        probs = torch.exp(probs)
+
+        on_mani_conv = on_mani.detach().cpu()
+
+        # Calculate the poincare coordinates
+        xy_poincare = lorentz_to_poincare(on_mani.squeeze(), radius)
+        namestr = args.namestr + str(epoch)
+        plot_density(xy_poincare, probs, flow_model.radius, namestr)
+
     return flow_model
 
-def train_flow_density(args, flow_model, n_blocks, radius, samples):
+def train_flow_density(args, flow_model, n_blocks, radius, samples,
+        clamped_threedim, on_mani):
     flow_model = kwargs_flows[flow_model](n_blocks, 2, 256, 1, layer_type='Linear',
                                           radius=torch.tensor(radius)).cuda()
     flow_opt = optim.Adam(flow_model.parameters())
@@ -242,17 +257,25 @@ def train_flow_density(args, flow_model, n_blocks, radius, samples):
         print("Loss:{}".format(train_loss_avg[-1]))
         print("Epoch:{}".format(epoch))
 
+        # Calculate densities of x, y coords on Lorentz model.
+        flow_model.base_dist_mean = torch.zeros_like(on_mani).cuda()
+        flow_model.base_dist_var = torch.ones(on_mani.shape[0], 2).cuda()
+        probs = flow_model.log_prob(on_mani)
+        probs += logmap_logdet(clamped_threedim.cuda(), radius)
+        probs = torch.exp(probs)
+
+        on_mani_conv = on_mani.detach().cpu()
+
+        # Calculate the poincare coordinates
+        xy_poincare = lorentz_to_poincare(on_mani.squeeze(), radius)
+        namestr = args.namestr + str(epoch)
+        plot_density(xy_poincare, probs, flow_model.radius, namestr)
+
     return flow_model
 
 def plot_flow(args, radius, flow, target, namestr, n_blocks=2, samples=None):
     fig = plt.figure()
     ax = fig.add_subplot(555)
-    # flow_model = train_potential_flow(flow, radius, target)
-    if samples is not None:
-        flow_model = train_flow_density(args, flow, n_blocks, radius, samples)
-    else:
-        flow_model = train_flow(args, flow, radius, target)
-
     # Map x, y coordinates on tangent space at origin to manifold (Lorentz model).
     x = torch.linspace(-5, 5, 100)
     xx, yy = torch.meshgrid((x, x))
@@ -267,10 +290,17 @@ def plot_flow(args, radius, flow, target, namestr, n_blocks=2, samples=None):
     clamped_threedim = clamp(threedim, min=-max_clamp_norm,
             max=max_clamp_norm).to(args.dev)
     on_mani = exp_map_mu0(clamped_threedim, radius).cuda()
-    flow_model.base_dist_mean = torch.zeros_like(on_mani).cuda()
-    flow_model.base_dist_var = torch.ones(on_mani.shape[0], 2).cuda()
+    # flow_model = train_potential_flow(flow, radius, target)
+    if samples is not None:
+        flow_model = train_flow_density(args, flow, n_blocks, radius, samples,
+                clamped_threedim, on_mani)
+    else:
+        flow_model = train_flow(args, flow, radius, target, clamped_threedim, on_mani)
+
 
     # Calculate densities of x, y coords on Lorentz model.
+    flow_model.base_dist_mean = torch.zeros_like(on_mani).cuda()
+    flow_model.base_dist_var = torch.ones(on_mani.shape[0], 2).cuda()
     probs = flow_model.log_prob(on_mani)
     probs += logmap_logdet(clamped_threedim.cuda(), radius)
     probs = torch.exp(probs)
@@ -385,14 +415,16 @@ def gauss(args, mu, std):
 
 
 def main(args):
-    mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0).to(args.dev)
-    std_1 = torch.Tensor([[0.5], [0.5]]).T.to(args.dev)
     # mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0).to(args.dev)
-    # std_1 = torch.Tensor([[1.0], [0.25]]).T.to(args.dev)
+    # std_1 = torch.Tensor([[0.5], [0.5]]).T.to(args.dev)
+    mean_1 = torch.Tensor([-1., 1.]).unsqueeze(0).to(args.dev)
+    std_1 = torch.Tensor([[1.0], [0.25]]).T.to(args.dev)
 
     # some_density(args)
-    mixture(args)
-    # gauss(args, mean_1, std_1)
+    if args.dataset == 'gauss':
+        gauss(args, mean_1, std_1)
+    else:
+        mixture(args)
 
 
 if __name__ == "__main__":
