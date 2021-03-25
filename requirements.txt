@@ -165,7 +165,7 @@ python-utils==2.3.0
 pytools==2018.5.2
 pytz==2019.3
 PyWavelets==1.0.1
-PyYAML==5.2
+PyYAML==5.4
 rdflib==4.2.2
 regex==2018.1.10
 requests==2.20.0
