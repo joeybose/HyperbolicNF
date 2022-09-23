@@ -141,7 +141,7 @@ proglog==0.1.9
 progressbar2==3.38.0
 promise==2.2.1
 prompt-toolkit==1.0.15
-protobuf==3.10.1
+protobuf==3.18.3
 psutil==5.6.7
 ptyprocess==0.6.0
 pudb==2018.1
