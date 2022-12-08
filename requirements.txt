@@ -16,7 +16,7 @@ boto3==1.9.228
 botocore==1.12.228
 box2d-py==2.3.8
 cached-property==1.5.1
-certifi==2019.11.28
+certifi==2022.12.7
 cffi==1.13.2
 chainer==5.0.0
 chardet==3.0.4
